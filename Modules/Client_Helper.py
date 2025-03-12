@@ -5,6 +5,9 @@ from numpy.polynomial.polynomial import Polynomial
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from typing import List, Tuple
+import hashlib
+from Crypto.Util import Counter
+from Crypto.Cipher import AES
 
 
 def rsaGenKey(numbit = 4096):
@@ -86,6 +89,8 @@ def exponent_mod(b: int, e: int, m: int):
   Output:
     - result: b^e modulo m
   """
+  if m == 1:
+    return 0
   result = 1
   while e > 0:
     if e % 2:
@@ -121,7 +126,7 @@ def checkCoeffs(poly: np.poly1d, coeffs: np.ndarray):
   """
   return all(poly.coefficients==coeffs)
 
-def maskModel(wlm: int, neighbors: List[Tuple[int, int]], ps: int, ss: int, self_id: int, g: int, q: int):
+def maskModel(wlm: int, neighbors: List[Tuple[int, int]], ps: int, ss: int, self_id: int, q: int):
     """
     Mask Local model by sharing secret
     -------
@@ -136,14 +141,45 @@ def maskModel(wlm: int, neighbors: List[Tuple[int, int]], ps: int, ss: int, self
     Output:
       - masked local model
     """
-    self_public = pow(g, ps, q)
-
+    
     for neighbor_id, neighbor_public in neighbors:
-        sign = -1 if self_id > neighbor_id else 1
-        wlm = (wlm + sign * self_public * neighbor_public) % q
+      sign = -1 if self_id > neighbor_id else 1
+      wlm = wlm + sign * aes_ctr_prg(exponent_mod(neighbor_public, ps, q))
 
-    return (wlm + ss) % q  
+    return wlm + ss
 
+
+def aes_ctr_prg(seed: int, num_bytes: int = 8):
+    """
+    Pseudo random generator using AES-CTR.
+    ------
+    Input:
+      - seed: integer used to generate a pseudo-random number
+      - num_bytes: length of the output in bytes
+    Output:
+      - A pseudo-random integer of size `num_bytes`
+    """
+    # Chuyển seed thành khóa AES (dùng SHA-256 -> 16 byte)
+    key = hashlib.sha256(str(seed).encode()).digest()[:16]
+
+    # Nonce 96-bit (12 byte) từ SHA-256 seed
+    nonce = hashlib.sha256(str(seed).encode()).digest()[:12]
+
+    # Tạo AES-CTR với nonce
+    cipher = AES.new(key, AES.MODE_CTR, nonce=nonce)
+
+    # Sinh số ngẫu nhiên
+    random_bytes = cipher.encrypt(b'\x00' * num_bytes)
+
+    # Chuyển thành số nguyên
+    result = int.from_bytes(random_bytes, "big")
+
+    return result
+
+# print(aes_ctr_prg(2))
+# print(aes_ctr_prg(2))
+
+# print(aes_ctr_prg(19472468722417397862558857150087778833563567447828596137285949137713554888004771279233477394582204013249209520541369050915998789018565616266327796914086325427778753887468211249285574734294151829310027214581775193890142939838132633371974477813502883331360744022497806724741968550141407644231522327645042702362263231672364430967906551566700028939158562682842922050404300793021053108400897416440694342611660893657584496011521574815551724188606262074259571796638737602576098759418276877681850654914056243425729800720713560064186603082272673535566186497264161034856105408817239711481740341605347326896143605436974992107063))
 #Test
 # (e,m), (d,m) = rsaGenKey()
 # print(e)
