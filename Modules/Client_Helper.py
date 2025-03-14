@@ -126,13 +126,13 @@ def checkCoeffs(poly: np.poly1d, coeffs: np.ndarray):
   """
   return all(poly.coefficients==coeffs)
 
-def maskModel(wlm: int, neighbors: List[Tuple[int, int]], ps: int, ss: int, self_id: int, q: int):
+def maskModel(wlm: int, neighbors: List[Tuple[int, int]], self_ps: int, self_ss: int, self_id: int, q: int):
     """
     Mask Local model by sharing secret
     -------
     Input:
       - wlm: weights local model in integer
-      - neigbors: id and public of each neighbor
+      - neigbors: id and (g^public mod q) of each neighbor
       - ps: pair secret of this local
       - ss: self secret of this local
       - self_id: id of this local
@@ -141,12 +141,11 @@ def maskModel(wlm: int, neighbors: List[Tuple[int, int]], ps: int, ss: int, self
     Output:
       - masked local model
     """
-    
     for neighbor_id, neighbor_public in neighbors:
       sign = -1 if self_id > neighbor_id else 1
-      wlm = wlm + sign * aes_ctr_prg(exponent_mod(neighbor_public, ps, q))
-
-    return wlm + ss
+      wlm = wlm + sign * aes_ctr_prg(exponent_mod(neighbor_public, self_ps, q))
+      
+    return wlm + aes_ctr_prg(self_ss)
 
 
 def aes_ctr_prg(seed: int, num_bytes: int = 8):
@@ -167,14 +166,17 @@ def aes_ctr_prg(seed: int, num_bytes: int = 8):
 
     # Tạo AES-CTR với nonce
     cipher = AES.new(key, AES.MODE_CTR, nonce=nonce)
-
-    # Sinh số ngẫu nhiên
     random_bytes = cipher.encrypt(b'\x00' * num_bytes)
 
     # Chuyển thành số nguyên
     result = int.from_bytes(random_bytes, "big")
 
     return result
+
+# print(exponent_mod(4, 3, 5))
+# print(aes_ctr_prg(exponent_mod(4, 3, 5)))
+# print(exponent_mod(9, 1, 5))
+# print(aes_ctr_prg(exponent_mod(9, 1, 5)))
 
 # print(aes_ctr_prg(2))
 # print(aes_ctr_prg(2))
